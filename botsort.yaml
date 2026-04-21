@@ -1,0 +1,113 @@
+# Ngưỡng confidence để đưa detection vào vòng ghép cặp chính (first association).
+# Tăng: giảm noise, ít tạo cặp sai, nhưng dễ bỏ sót object yếu.
+# Giảm: bắt được object yếu tốt hơn, nhưng dễ tăng false positive và ID switch.
+track_high_thresh:
+  type: uniform
+  default: 0.3
+  range: [0.2, 0.7]
+
+# Ngưỡng confidence tối thiểu để giữ detection cho vòng ghép cặp thứ 2.
+# Tăng: lọc mạnh detection kém chất lượng.
+# Giảm: giữ được nhiều detection yếu hơn, nhưng dễ dính nhiễu nhiều.
+track_low_thresh:
+  type: uniform
+  default: 0.1
+  range: [0.01, 0.3]
+
+# Ngưỡng tạo track mới.
+# Tăng: hạn chế tạo ID mới lung tung.
+# Giảm: dễ tạo ID mới hơn (tốt khi object xuất hiện đột ngột), nhưng dễ trùng lặp ID.
+new_track_thresh:
+  type: uniform
+  default: 0.7
+  range: [0.2, 0.9]
+
+# Số frame tối đa giữ track ở trạng thái lost trước khi xóa hẳn.
+# Tăng: object ra khỏi khung rồi quay lại dễ được gán lại ID cũ hơn.
+# Giảm: xóa track nhanh, dễ mất cơ hội re-assign ID cũ.
+track_buffer:
+  type: randint
+  default: 500
+  range: [30, 600]
+
+# Ngưỡng chấp nhận cost sau khi trộn (IoU + embedding) trong Hungarian matching.
+# Tăng: dễ match hơn (giữ ID liền mạch), nhưng có nguy cơ gán nhầm ID.
+# Giảm: match chặt hơn, nhưng dễ tạo ID mới khi object quay lại.
+match_thresh:
+  type: uniform
+  default: 0.8
+  range: [0.1, 0.9]
+
+# Ngưỡng gần về hình học (IoU-distance gate) dùng trong logic liên quan đến proximity.
+# Giá trị cao -> gate lỏng hơn; giá trị thấp -> gate chặt hơn.
+# Trong bản đã ưu tiên ReID, tham số này ảnh hưởng nhẹ hơn trước.
+proximity_thresh:
+  type: uniform
+  default: 0.7
+  range: [0.25, 0.75]
+
+# Ngưỡng embedding distance (cosine distance) để coi là cùng danh tính.
+# Tăng: dễ chấp nhận match theo ngoại hình hơn (reconnect ID mạnh hơn).
+# Giảm: chặt hơn, giảm nhầm ID nhưng dễ fail khi object thay đổi pose/ánh sáng.
+appearance_thresh:
+  type: uniform
+  default: 0.3
+  range: [0.1, 0.8]
+
+
+# Ngưỡng ghép cặp cho vòng association thứ 2 (low-score detections).
+# Mặc định trước đây bị fix cứng là 0.5 trong code BoxMOT.
+# Tăng: dễ ghép hơn ở vòng 2, có thể giữ track tốt hơn nhưng dễ nhầm ID.
+# Giảm: ghép chặt hơn, giảm nhầm nhưng dễ bỏ lỡ reconnect.
+second_association_thresh:
+  type: uniform
+  default: 0.5
+  range: [0.1, 0.95]
+
+# Ngưỡng ghép cặp cho nhóm track unconfirmed.
+# Mặc định trước đây bị fix cứng là 0.7 trong code BoxMOT.
+# Tăng: dễ xác nhận track mới nhanh hơn.
+# Giảm: xác nhận chặt hơn, hạn chế track ảo nhưng có thể tạo ID mới nhiều hơn.
+unconfirmed_association_thresh:
+  type: uniform
+  default: 0.7
+  range: [0.1, 0.95]
+
+# Bật/tắt bước "cứu vãn ReID" cho track Lost chưa ghép được,
+# chạy trước khi tạo ID mới để giảm ID switch khi vật thể quay lại.
+reid_recovery_enabled: true
+
+# Ngưỡng proximity (IoU-distance gate) riêng cho bước reid_recovery.
+# Tăng: gate lỏng hơn, recovery dễ match hơn theo ReID.
+# Giảm: gate chặt hơn, giảm nhầm ID khi đối tượng ở xa.
+reid_recovery_proximity_thresh:
+  type: uniform
+  default: 0.88
+  range: [0.25, 0.9]
+
+# Ngưỡng appearance (embedding distance) riêng cho bước reid_recovery.
+# Tăng: nới lỏng điều kiện ngoại hình trong recovery.
+# Giảm: siết chặt điều kiện ngoại hình trong recovery.
+reid_recovery_appearance_thresh:
+  type: uniform
+  default: 0.5
+  range: [0.1, 0.8]
+
+# Ngưỡng cost cho bước reid_recovery sau khi lấy trung bình:
+# d = (iou_dist + emb_dist) / 2.
+# Tăng: dễ match hơn; Giảm: match chặt hơn.
+# Recommended range: [0.20, 0.55], default: 0.35
+reid_recovery_thresh: 0.48
+
+# Camera Motion Compensation.
+# ecc: thường ổn định và chính xác hơn trong nhiều bối cảnh.
+# sof: nhanh hơn tùy implementation, nhưng có thể kém bền vững hơn tùy video.
+cmc_method:
+  type: choice
+  default: ecc
+  options: [sof, ecc]
+
+# Hướng dẫn tune nhanh cho bài toán "ra khỏi khung -> quay lại":
+# 1) Tăng track_buffer (ví dụ 300-450) để giữ lost track lâu hơn.
+# 2) Tăng appearance_thresh vừa phải nếu model embed mạnh.
+# 3) Nếu bị gán nhầm ID, giảm appearance_thresh hoặc tăng proximity_thresh.

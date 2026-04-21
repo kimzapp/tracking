@@ -1,0 +1,7 @@
+ultralytics
+tqdm
+PyYAML
+lapx
+scipy
+gdown
+filelock
