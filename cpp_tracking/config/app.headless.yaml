@@ -4,7 +4,7 @@ output_path: ../video/longchau_cpp_output.mp4
 execution_device: auto   # auto | gpu | cpu
 gpu_device_id: 0
 
-det_conf: 0.38
+det_conf: 0.5
 det_iou: 0.50
 input_width: 640
 input_height: 640
@@ -16,27 +16,23 @@ draw_tracks: true
 baseline_output_path: ../video/cpp_baseline.json
 tracker_type: botsort
 
-track_high_thresh: 0.14
-track_low_thresh: 0.05
-new_track_thresh: 0.35
+track_high_thresh: 0.3
+track_low_thresh: 0.1
+new_track_thresh: 0.7
 track_buffer: 900
-match_thresh: 0.92
-proximity_thresh: 0.85
-appearance_thresh: 0.45
-reid_recovery_enabled: true
-reid_recovery_proximity_thresh: 0.93
-reid_recovery_appearance_thresh: 0.65
-reid_recovery_thresh: 0.75
-second_association_thresh: 0.72
-unconfirmed_association_thresh: 0.82
+match_thresh: 0.8
+proximity_thresh: 0.7
+appearance_thresh: 0.3
+second_association_thresh: 0.5
+unconfirmed_association_thresh: 0.7
 cmc_method: ecc
-with_reid: true
-fuse_first_associate: false
+reid_recovery_enabled: true
+reid_recovery_proximity_thresh: 0.88
+reid_recovery_appearance_thresh: 0.5
+reid_recovery_thresh: 0.48
 reid_model_path: ../models/osnet_x0_5_msmt17.onnx
 reid_execution_device: auto   # optional override for ReID
-reid_gpu_device_id: 0
-cmc_interval: 3
+cmc_interval: 2
 cmc_max_side: 960
 reid_max_detections: 96
-frame_rate: 30
 
