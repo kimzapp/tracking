@@ -97,6 +97,7 @@ target_link_libraries(tracking_app
 if(WIN32)
   get_filename_component(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_LIBRARY}" DIRECTORY)
   set(ONNXRUNTIME_DLL_PATH "${ONNXRUNTIME_LIB_DIR}/onnxruntime.dll")
+  file(GLOB ONNXRUNTIME_PROVIDER_DLLS "${ONNXRUNTIME_LIB_DIR}/onnxruntime_providers*.dll")
   if(EXISTS "${ONNXRUNTIME_DLL_PATH}")
     add_custom_command(TARGET tracking_app POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -104,6 +105,14 @@ if(WIN32)
               $<TARGET_FILE_DIR:tracking_app>
       COMMENT "Copying onnxruntime.dll next to tracking_app"
     )
+    foreach(_provider_dll IN LISTS ONNXRUNTIME_PROVIDER_DLLS)
+      add_custom_command(TARGET tracking_app POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${_provider_dll}"
+                $<TARGET_FILE_DIR:tracking_app>
+        COMMENT "Copying ONNX Runtime provider DLL: ${_provider_dll}"
+      )
+    endforeach()
   else()
     message(WARNING "onnxruntime.dll was not found at ${ONNXRUNTIME_DLL_PATH}; runtime may fail if PATH resolves a different ONNX Runtime version")
   endif()

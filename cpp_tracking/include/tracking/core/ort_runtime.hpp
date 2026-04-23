@@ -11,6 +11,8 @@ struct OrtRuntimeSelection {
   std::string requested_device = "auto";
   std::string effective_device = "cpu";
   std::string provider;
+  std::string fallback_reason;
+  std::vector<std::string> available_providers;
 };
 
 std::vector<std::string> GetAvailableOrtProviders();

@@ -1161,6 +1161,16 @@ BoTSORTTracker::ReIdExtractor::ReIdExtractor(const TrackerRuntimeConfig& cfg)
       LogInfo("ReID runtime: GPU provider=" + runtime_selection.provider);
     } else {
       LogInfo("ReID runtime: CPU");
+      if (!runtime_selection.fallback_reason.empty()) {
+        LogWarn("ReID GPU fallback reason: " + runtime_selection.fallback_reason);
+      }
+    }
+    if (!runtime_selection.available_providers.empty()) {
+      std::string providers = runtime_selection.available_providers.front();
+      for (size_t i = 1; i < runtime_selection.available_providers.size(); ++i) {
+        providers += ", " + runtime_selection.available_providers[i];
+      }
+      LogInfo("ONNX Runtime providers: " + providers);
     }
     ready_ = true;
   } catch (const std::exception& ex) {

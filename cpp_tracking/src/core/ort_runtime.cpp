@@ -37,7 +37,8 @@ bool AppendProvider(Ort::SessionOptions* options, const std::string& provider,
   }
 
   OrtStatus* status = Ort::GetApi().SessionOptionsAppendExecutionProvider(
-      *options, provider.c_str(), keys.data(), values.data(), keys.size());
+      *options, provider.c_str(), keys.empty() ? nullptr : keys.data(),
+      values.empty() ? nullptr : values.data(), keys.size());
   if (status == nullptr) {
     return true;
   }
@@ -98,6 +99,7 @@ OrtRuntimeSelection ConfigureOrtExecutionProvider(Ort::SessionOptions* options,
   }
 
   const auto available = GetAvailableOrtProviders();
+  selection.available_providers = available;
   const std::unordered_set<std::string> available_set(available.begin(), available.end());
 
   std::vector<std::pair<std::string, std::string>> gpu_options = {
@@ -112,7 +114,8 @@ OrtRuntimeSelection ConfigureOrtExecutionProvider(Ort::SessionOptions* options,
     if (!ContainsProvider(available_set, provider)) {
       continue;
     }
-    if (AppendProvider(options, provider, gpu_options, &last_error)) {
+    if (AppendProvider(options, provider, gpu_options, &last_error) ||
+        AppendProvider(options, provider, {}, &last_error)) {
       selection.effective_device = "gpu";
       selection.provider = provider;
       return selection;
@@ -125,6 +128,12 @@ OrtRuntimeSelection ConfigureOrtExecutionProvider(Ort::SessionOptions* options,
       message += ". Last provider error: " + last_error;
     }
     throw std::runtime_error(message);
+  }
+
+  if (available.empty()) {
+    selection.fallback_reason = "No ONNX Runtime providers reported";
+  } else {
+    selection.fallback_reason = "No GPU provider available or provider init failed";
   }
 
   return selection;

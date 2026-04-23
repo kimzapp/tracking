@@ -92,6 +92,16 @@ YoloOnnxDetector::YoloOnnxDetector(const std::string& model_path, int input_widt
     LogInfo("Detector runtime: GPU provider=" + runtime_selection_.provider);
   } else {
     LogInfo("Detector runtime: CPU");
+    if (!runtime_selection_.fallback_reason.empty()) {
+      LogWarn("Detector GPU fallback reason: " + runtime_selection_.fallback_reason);
+    }
+  }
+  if (!runtime_selection_.available_providers.empty()) {
+    std::string providers = runtime_selection_.available_providers.front();
+    for (size_t i = 1; i < runtime_selection_.available_providers.size(); ++i) {
+      providers += ", " + runtime_selection_.available_providers[i];
+    }
+    LogInfo("ONNX Runtime providers: " + providers);
   }
 }
 
