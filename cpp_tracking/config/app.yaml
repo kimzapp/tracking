@@ -1,0 +1,34 @@
+model_path: ../models/best.onnx
+video_path: ../video/longchau.mp4
+output_path: ../video/longchau_cpp_output.mp4
+baseline_output_path: ../video/longchau_cpp_baseline.json
+
+det_conf: 0.6
+det_iou: 0.50
+input_width: 640
+input_height: 640
+
+show_window: true
+window_name: YOLO ONNX + Tracker (C++)
+tracker_type: botsort
+draw_detections: false
+draw_tracks: true
+with_reid: true
+cmc_method: ecc
+track_high_thresh: 0.20
+track_low_thresh: 0.10
+new_track_thresh: 0.20
+track_buffer: 500
+match_thresh: 0.80
+proximity_thresh: 0.70
+appearance_thresh: 0.30
+second_association_thresh: 0.50
+unconfirmed_association_thresh: 0.70
+reid_recovery_enabled: true
+reid_recovery_proximity_thresh: 0.88
+reid_recovery_appearance_thresh: 0.50
+reid_recovery_thresh: 0.48
+reid_model_path: ../models/osnet_x0_5_msmt17.onnx
+cmc_interval: 2
+cmc_max_side: 960
+reid_max_detections: 64

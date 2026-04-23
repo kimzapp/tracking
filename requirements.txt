@@ -5,3 +5,5 @@ lapx
 scipy
 gdown
 filelock
+loguru
+click

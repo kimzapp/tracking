@@ -14,10 +14,11 @@ from tracking_engine.tracker_lib import Tracker
 @dataclass(slots=True)
 class TrackingConfig:
 	"""Cấu hình runtime cho bài toán detect + track trên video."""
+	detector_path: str = "./best_openvino_model"
 	detector_weights: str = "openvino"
 	tracker_config_path: str = "botsort.yaml"
-	reid_model: str = "osnet_x0_5_msmt17.pt"
-	video_path: str = "video/test1.mp4"
+	reid_model: str = "models/osnet_x0_5_msmt17.pt"
+	video_path: str = "video/longchau.mp4"
 	output_video_path: str = video_path.replace(".mp4", "_output.mp4")
 	det_conf: float = 0.65
 	det_iou: float = 0.5
@@ -114,7 +115,7 @@ def create_video_writer(cap: cv2.VideoCapture, cfg: TrackingConfig) -> cv2.Video
 def run_tracking_video(cfg: TrackingConfig) -> set[int]:
 	"""Chạy tracking theo từng frame và trả về tập ID đã xuất hiện."""
 	# Khởi tạo detector YOLO và tracker
-	detector = YOLO("./model", task="detect")
+	detector = YOLO(cfg.detector_path, task="detect")
 	tracker = Tracker(
 		tracker_config_path=cfg.tracker_config_path,
 		reid_model=cfg.reid_model,

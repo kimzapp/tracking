@@ -1,3 +1,4 @@
 video
 .venv
 __pycache__
+build
