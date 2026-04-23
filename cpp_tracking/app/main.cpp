@@ -52,6 +52,21 @@ cv::Scalar DetectionColor(float cls) {
   return kDetectionPalette[idx];
 }
 
+std::string FrameProgressLabel(int frame_index, int total_frames) {
+  if (total_frames > 0) {
+    return std::to_string(frame_index) + "/" + std::to_string(total_frames);
+  }
+  return std::to_string(frame_index) + "/?";
+}
+
+void LogFrameProgress(int frame_index, int total_frames, size_t detection_count, size_t active_track_count,
+                      size_t unique_seen_ids) {
+  LogInfo("Frame " + FrameProgressLabel(frame_index, total_frames) + " | dets=" +
+          std::to_string(detection_count) + " | active_tracks=" +
+          std::to_string(active_track_count) + " | unique_ids_seen=" +
+          std::to_string(unique_seen_ids));
+}
+
 void DrawTrack(cv::Mat* frame, const Track& track) {
   cv::Rect box(static_cast<int>(track.x1), static_cast<int>(track.y1),
                static_cast<int>(track.x2 - track.x1), static_cast<int>(track.y2 - track.y1));
@@ -223,6 +238,11 @@ int main(int argc, char** argv) {
     if (fps <= 0.0) {
       fps = 30.0;
     }
+    int total_frames = static_cast<int>(std::llround(cap.get(cv::CAP_PROP_FRAME_COUNT)));
+    if (total_frames <= 0) {
+      total_frames = -1;
+    }
+    const int frame_log_interval = cfg.show_window ? 30 : 1;
 
     const std::filesystem::path output_path(cfg.output_path);
     if (!output_path.parent_path().empty()) {
@@ -238,10 +258,15 @@ int main(int argc, char** argv) {
     std::vector<tracking::Detections> all_dets;
     std::vector<tracking::Tracks> all_tracks;
     cv::Mat frame;
+    int frame_index = 0;
 
     while (cap.read(frame)) {
+      frame_index += 1;
       tracking::Detections detections = detector.Predict(frame);
       tracking::Tracks tracks = tracker->Update(detections, frame);
+      for (const tracking::Track& t : tracks) {
+        seen_ids.insert(t.id);
+      }
 
       if (cfg.draw_detections) {
         for (const tracking::Detection& d : detections) {
@@ -250,7 +275,6 @@ int main(int argc, char** argv) {
       }
       if (cfg.draw_tracks) {
         for (const tracking::Track& t : tracks) {
-          seen_ids.insert(t.id);
           tracking::DrawTrack(&frame, t);
         }
       }
@@ -261,6 +285,12 @@ int main(int argc, char** argv) {
       }
 
       writer.write(frame);
+
+      if (frame_index == 1 || frame_index % frame_log_interval == 0 ||
+          (total_frames > 0 && frame_index >= total_frames)) {
+        tracking::LogFrameProgress(frame_index, total_frames, detections.size(), tracks.size(),
+                                   seen_ids.size());
+      }
 
       if (cfg.show_window) {
         cv::imshow(cfg.window_name, frame);
@@ -279,6 +309,7 @@ int main(int argc, char** argv) {
       tracking::LogInfo("Saved baseline json to: " + cfg.baseline_output_path);
     }
 
+    tracking::LogInfo("Processed frames: " + std::to_string(frame_index));
     tracking::LogInfo("Done. Seen IDs: " + std::to_string(seen_ids.size()));
     tracking::LogInfo("Saved output to: " + cfg.output_path);
     return 0;
