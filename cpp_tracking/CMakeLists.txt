@@ -21,7 +21,7 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-find_package(OpenCV REQUIRED COMPONENTS core imgproc highgui videoio dnn)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc highgui videoio dnn video)
 find_package(yaml-cpp REQUIRED)
 find_package(ONNXRuntime REQUIRED)
 
