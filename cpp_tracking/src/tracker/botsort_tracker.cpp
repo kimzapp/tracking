@@ -15,6 +15,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/video/tracking.hpp>
 
+#include "tracking/core/ort_runtime.hpp"
 #include "tracking/utils/logging.hpp"
 
 #ifdef _WIN32
@@ -1132,6 +1133,8 @@ BoTSORTTracker::ReIdExtractor::ReIdExtractor(const TrackerRuntimeConfig& cfg)
   try {
     options_.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
     options_.SetIntraOpNumThreads(1);
+    const OrtRuntimeSelection runtime_selection =
+        ConfigureOrtExecutionProvider(&options_, cfg.execution_device, cfg.gpu_device_id);
 #ifdef _WIN32
     const std::wstring path = Utf8ToWide(cfg.reid_model_path);
     session_ = std::make_unique<Ort::Session>(env_, path.c_str(), options_);
@@ -1154,8 +1157,14 @@ BoTSORTTracker::ReIdExtractor::ReIdExtractor(const TrackerRuntimeConfig& cfg)
       input_height_ = static_cast<int>(shape[2]);
       input_width_ = static_cast<int>(shape[3]);
     }
+    if (runtime_selection.effective_device == "gpu") {
+      LogInfo("ReID runtime: GPU provider=" + runtime_selection.provider);
+    } else {
+      LogInfo("ReID runtime: CPU");
+    }
     ready_ = true;
-  } catch (...) {
+  } catch (const std::exception& ex) {
+    LogWarn(std::string("ReID runtime init failed: ") + ex.what());
     ready_ = false;
   }
 }

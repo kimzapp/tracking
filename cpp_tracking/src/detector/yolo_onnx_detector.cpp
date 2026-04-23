@@ -9,6 +9,9 @@
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
 
+#include "tracking/core/ort_runtime.hpp"
+#include "tracking/utils/logging.hpp"
+
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -56,7 +59,8 @@ float Sigmoid(float x) {
 }  // namespace
 
 YoloOnnxDetector::YoloOnnxDetector(const std::string& model_path, int input_width,
-                                   int input_height, float conf_thresh, float iou_thresh)
+                                   int input_height, float conf_thresh, float iou_thresh,
+                                   const std::string& execution_device, int gpu_device_id)
     : env_(ORT_LOGGING_LEVEL_WARNING, "tracking_yolo"),
       input_width_(input_width),
       input_height_(input_height),
@@ -64,6 +68,8 @@ YoloOnnxDetector::YoloOnnxDetector(const std::string& model_path, int input_widt
       iou_thresh_(iou_thresh) {
   session_options_.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
   session_options_.SetIntraOpNumThreads(1);
+  runtime_selection_ =
+      ConfigureOrtExecutionProvider(&session_options_, execution_device, gpu_device_id);
 
 #ifdef _WIN32
   const std::wstring wide_model_path = Utf8ToWide(model_path);
@@ -80,6 +86,12 @@ YoloOnnxDetector::YoloOnnxDetector(const std::string& model_path, int input_widt
   {
     Ort::AllocatedStringPtr name = session_->GetOutputNameAllocated(0, allocator);
     output_name_ = name.get();
+  }
+
+  if (runtime_selection_.effective_device == "gpu") {
+    LogInfo("Detector runtime: GPU provider=" + runtime_selection_.provider);
+  } else {
+    LogInfo("Detector runtime: CPU");
   }
 }
 

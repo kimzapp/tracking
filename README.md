@@ -83,3 +83,4 @@ Với config tùy chỉnh:
 - Mặc định tracker là `botsort` (đặt trong `cpp_tracking/config/app.yaml`).
 - Có thể đổi sang `passthrough` để debug, nhưng không dùng cho luồng tracking chuẩn.
 - Nếu muốn nhìn rõ ID hơn, giữ `draw_tracks: true` và `show_window: true` trong config.
+- Có thể bật tự động dùng GPU bằng `execution_device: auto` (mặc định). Đặt `execution_device: gpu` để ép GPU (sẽ báo lỗi nếu không có provider GPU), hoặc `cpu` để chỉ chạy CPU. `gpu_device_id` chọn GPU index.

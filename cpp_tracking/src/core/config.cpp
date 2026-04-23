@@ -81,6 +81,8 @@ AppConfig LoadAppConfig(const std::string& path) {
   ReadScalarIfPresent(root, "model_path", &cfg.model_path);
   ReadScalarIfPresent(root, "video_path", &cfg.video_path);
   ReadScalarIfPresent(root, "output_path", &cfg.output_path);
+  ReadScalarIfPresent(root, "execution_device", &cfg.execution_device);
+  ReadScalarIfPresent(root, "gpu_device_id", &cfg.gpu_device_id);
 
   ReadScalarIfPresent(root, "det_conf", &cfg.det_conf);
   ReadScalarIfPresent(root, "det_iou", &cfg.det_iou);
@@ -93,6 +95,10 @@ AppConfig LoadAppConfig(const std::string& path) {
   ReadScalarIfPresent(root, "draw_tracks", &cfg.draw_tracks);
   ReadScalarIfPresent(root, "baseline_output_path", &cfg.baseline_output_path);
   ReadCfgValueIfPresent(root, "tracker_type", &cfg.tracker.tracker_type);
+  cfg.tracker.execution_device = cfg.execution_device;
+  cfg.tracker.gpu_device_id = cfg.gpu_device_id;
+  ReadCfgValueIfPresent(root, "reid_execution_device", &cfg.tracker.execution_device);
+  ReadCfgValueIfPresent(root, "reid_gpu_device_id", &cfg.tracker.gpu_device_id);
 
   ReadCfgValueIfPresent(root, "track_high_thresh", &cfg.tracker.track_high_thresh);
   ReadCfgValueIfPresent(root, "track_low_thresh", &cfg.tracker.track_low_thresh);
@@ -171,6 +177,24 @@ AppConfig LoadAppConfig(const std::string& path) {
   cfg.tracker.tracker_type = ToLower(cfg.tracker.tracker_type);
   if (cfg.tracker.tracker_type != "botsort" && cfg.tracker.tracker_type != "passthrough") {
     throw std::runtime_error("tracker_type must be one of: botsort, passthrough");
+  }
+
+  cfg.execution_device = ToLower(cfg.execution_device);
+  if (cfg.execution_device != "auto" && cfg.execution_device != "cpu" &&
+      cfg.execution_device != "gpu") {
+    throw std::runtime_error("execution_device must be one of: auto, cpu, gpu");
+  }
+  if (cfg.gpu_device_id < 0) {
+    throw std::runtime_error("gpu_device_id must be >= 0");
+  }
+
+  cfg.tracker.execution_device = ToLower(cfg.tracker.execution_device);
+  if (cfg.tracker.execution_device != "auto" && cfg.tracker.execution_device != "cpu" &&
+      cfg.tracker.execution_device != "gpu") {
+    throw std::runtime_error("reid_execution_device must be one of: auto, cpu, gpu");
+  }
+  if (cfg.tracker.gpu_device_id < 0) {
+    throw std::runtime_error("reid_gpu_device_id must be >= 0");
   }
 
   cfg.tracker.cmc_method = ToLower(cfg.tracker.cmc_method);

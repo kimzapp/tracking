@@ -9,13 +9,15 @@
 #include <opencv2/core.hpp>
 
 #include "tracking/core/types.hpp"
+#include "tracking/core/ort_runtime.hpp"
 
 namespace tracking {
 
 class YoloOnnxDetector {
  public:
   YoloOnnxDetector(const std::string& model_path, int input_width, int input_height,
-                   float conf_thresh, float iou_thresh);
+                   float conf_thresh, float iou_thresh, const std::string& execution_device,
+                   int gpu_device_id);
 
   Detections Predict(const cv::Mat& frame);
 
@@ -41,6 +43,7 @@ class YoloOnnxDetector {
   int input_height_;
   float conf_thresh_;
   float iou_thresh_;
+  OrtRuntimeSelection runtime_selection_;
 };
 
 }  // namespace tracking
