@@ -221,8 +221,10 @@ int main(int argc, char** argv) {
     const tracking::AppConfig cfg = tracking::LoadAppConfig(config_path);
 
     tracking::LogInfo("Loading ONNX detector: " + cfg.model_path);
+    tracking::LogInfo("Inference device preference: " + cfg.execution_device +
+                      " (gpu_device_id=" + std::to_string(cfg.gpu_device_id) + ")");
     tracking::YoloOnnxDetector detector(cfg.model_path, cfg.input_width, cfg.input_height, cfg.det_conf,
-                                        cfg.det_iou);
+                                        cfg.det_iou, cfg.execution_device, cfg.gpu_device_id);
 
     std::unique_ptr<tracking::ITracker> tracker = tracking::CreateTracker(cfg.tracker);
     tracking::LogInfo("Tracker type: " + cfg.tracker.tracker_type);

@@ -7,6 +7,8 @@ namespace tracking {
 
 struct TrackerRuntimeConfig {
   std::string tracker_type = "botsort";
+  std::string execution_device = "auto";
+  int gpu_device_id = 0;
 
   float track_high_thresh = 0.25F;
   float track_low_thresh = 0.10F;
@@ -37,6 +39,8 @@ struct AppConfig {
   std::string model_path = "../best.onnx";
   std::string video_path = "../video/longchau.mp4";
   std::string output_path = "../video/longchau_cpp_output.mp4";
+  std::string execution_device = "auto";
+  int gpu_device_id = 0;
 
   float det_conf = 0.65F;
   float det_iou = 0.50F;

@@ -27,6 +27,7 @@ find_package(ONNXRuntime REQUIRED)
 
 add_library(tracking_core
   src/core/config.cpp
+  src/core/ort_runtime.cpp
   src/utils/logging.cpp
 )
 
@@ -38,6 +39,7 @@ target_include_directories(tracking_core
 target_link_libraries(tracking_core
   PUBLIC
     yaml-cpp::yaml-cpp
+    ONNXRuntime::ONNXRuntime
 )
 
 add_library(tracking_detector
