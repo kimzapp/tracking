@@ -100,6 +100,13 @@ fi
 
 echo "[INFO] Executable: \"$APP_EXE\""
 echo "[INFO] Config: \"$CONFIG_FILE\""
+echo "[INFO] ONNXRUNTIME_ROOT: \"${ONNXRUNTIME_ROOT:-}\""
+echo "[INFO] ONNXRUNTIME_LIB_DIR: \"${ONNXRUNTIME_LIB_DIR:-}\""
+echo "[INFO] LD_LIBRARY_PATH: \"${LD_LIBRARY_PATH:-}\""
+if command -v ldd >/dev/null 2>&1; then
+  echo "[INFO] ldd (onnxruntime/cuda/cudnn related):"
+  ldd "$APP_EXE" 2>/dev/null | awk '/onnxruntime|cuda|cudnn|cublas|cufft|curand/ { print "  " $0 }'
+fi
 
 # ================================
 # Run app

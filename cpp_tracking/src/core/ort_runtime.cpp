@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstddef>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -21,6 +23,30 @@ std::string ToLower(std::string text) {
 
 bool ContainsProvider(const std::unordered_set<std::string>& available, const std::string& name) {
   return available.find(name) != available.end();
+}
+
+bool ContainsAnyProviderAlias(const std::unordered_set<std::string>& available,
+                              const std::vector<std::string>& aliases) {
+  for (const std::string& alias : aliases) {
+    if (ContainsProvider(available, alias)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::string JoinProviders(const std::vector<std::string>& providers) {
+  if (providers.empty()) {
+    return "(none)";
+  }
+  std::ostringstream oss;
+  for (size_t i = 0; i < providers.size(); ++i) {
+    if (i > 0) {
+      oss << ", ";
+    }
+    oss << providers[i];
+  }
+  return oss.str();
 }
 
 bool AppendProvider(Ort::SessionOptions* options, const std::string& provider,
@@ -56,6 +82,29 @@ bool AppendProvider(Ort::SessionOptions* options, const std::string& provider,
   }
   return false;
 #endif
+}
+
+bool AppendCudaProvider(Ort::SessionOptions* options, int gpu_device_id, std::string* error_message) {
+  OrtCUDAProviderOptions cuda_options{};
+  cuda_options.device_id = std::max(0, gpu_device_id);
+  cuda_options.arena_extend_strategy = 0;
+  cuda_options.gpu_mem_limit = SIZE_MAX;
+  cuda_options.cudnn_conv_algo_search = OrtCudnnConvAlgoSearchDefault;
+  cuda_options.do_copy_in_default_stream = 1;
+  cuda_options.has_user_compute_stream = 0;
+  cuda_options.user_compute_stream = nullptr;
+  cuda_options.default_memory_arena_cfg = nullptr;
+
+  OrtStatus* status =
+      Ort::GetApi().SessionOptionsAppendExecutionProvider_CUDA(*options, &cuda_options);
+  if (status == nullptr) {
+    return true;
+  }
+  if (error_message != nullptr) {
+    *error_message = Ort::GetApi().GetErrorMessage(status);
+  }
+  Ort::GetApi().ReleaseStatus(status);
+  return false;
 }
 
 }  // namespace
@@ -105,28 +154,63 @@ OrtRuntimeSelection ConfigureOrtExecutionProvider(Ort::SessionOptions* options,
   std::vector<std::pair<std::string, std::string>> gpu_options = {
       {"device_id", std::to_string(std::max(0, gpu_device_id))}};
 
-  const std::array<std::string, 5> gpu_provider_priority = {
-      "CUDAExecutionProvider", "DmlExecutionProvider", "TensorrtExecutionProvider",
-      "ROCMExecutionProvider", "CoreMLExecutionProvider"};
+  struct GpuProviderCandidate {
+    std::string provider;
+    std::vector<std::string> availability_aliases;
+    std::vector<std::string> append_aliases;
+    bool try_cuda_specialized_api = false;
+  };
+
+  const std::array<GpuProviderCandidate, 5> gpu_provider_priority = {{
+      {"CUDAExecutionProvider",
+       {"CUDAExecutionProvider", "CUDA"},
+       {"CUDAExecutionProvider", "CUDA"},
+       true},
+      {"DmlExecutionProvider", {"DmlExecutionProvider", "DMLExecutionProvider", "DML"},
+       {"DmlExecutionProvider", "DMLExecutionProvider", "DML"}, false},
+      {"TensorrtExecutionProvider",
+       {"TensorrtExecutionProvider", "TensorRTExecutionProvider", "TENSORRT"},
+       {"TensorrtExecutionProvider", "TensorRTExecutionProvider", "TENSORRT"}, false},
+      {"ROCMExecutionProvider", {"ROCMExecutionProvider", "ROCM"},
+       {"ROCMExecutionProvider", "ROCM"}, false},
+      {"CoreMLExecutionProvider", {"CoreMLExecutionProvider", "COREML"},
+       {"CoreMLExecutionProvider", "COREML"}, false},
+  }};
 
   std::string last_error;
-  for (const std::string& provider : gpu_provider_priority) {
-    if (!ContainsProvider(available_set, provider)) {
+  for (const GpuProviderCandidate& candidate : gpu_provider_priority) {
+    if (!ContainsAnyProviderAlias(available_set, candidate.availability_aliases)) {
       continue;
     }
-    if (AppendProvider(options, provider, gpu_options, &last_error) ||
-        AppendProvider(options, provider, {}, &last_error)) {
+
+    if (candidate.try_cuda_specialized_api &&
+        AppendCudaProvider(options, gpu_device_id, &last_error)) {
       selection.effective_device = "gpu";
-      selection.provider = provider;
+      selection.provider = candidate.provider;
       return selection;
+    }
+
+    for (const std::string& provider_alias : candidate.append_aliases) {
+      if (AppendProvider(options, provider_alias, gpu_options, &last_error) ||
+          AppendProvider(options, provider_alias, {}, &last_error)) {
+        selection.effective_device = "gpu";
+        selection.provider = candidate.provider;
+        return selection;
+      }
     }
   }
 
   if (selection.requested_device == "gpu") {
-    std::string message = "GPU mode requested, but no supported GPU provider could be enabled";
+    std::string message =
+        "GPU mode requested, but no supported GPU provider could be enabled. "
+        "Available ONNX Runtime providers: " +
+        JoinProviders(available);
     if (!last_error.empty()) {
       message += ". Last provider error: " + last_error;
     }
+    message +=
+        ". Ensure the loaded ONNX Runtime build includes CUDA EP and that CUDA/cuDNN runtime "
+        "libraries are visible to the process (LD_LIBRARY_PATH/PATH).";
     throw std::runtime_error(message);
   }
 

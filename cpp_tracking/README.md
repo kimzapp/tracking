@@ -94,6 +94,29 @@ export OPENCV_LIB_DIR=/usr/local/lib
 ./run.sh
 ```
 
+## GPU troubleshooting (Linux, CUDA 11.8)
+
+If you set `execution_device: gpu` but runtime still reports no CUDA provider, verify that
+`tracking_app` is loading a GPU-enabled ONNX Runtime package (not CPU-only/mobile).
+
+1. Point runtime to your ONNX Runtime GPU folder:
+
+```bash
+export ONNXRUNTIME_ROOT=/opt/onnxruntime-linux-x64-gpu-<version>
+export LD_LIBRARY_PATH="${ONNXRUNTIME_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+```
+
+2. Re-run `./run.sh config/app.headless.yaml` and check startup logs:
+   - `ONNX Runtime providers` should include `CUDAExecutionProvider` (or `CUDA` on some builds).
+   - If you only see providers like `OPENVINO`, `SNPE`, `XNNPACK`, `QNN`, `WEBNN`, `AZURE`,
+     your process is not loading the CUDA build.
+
+3. Ensure CUDA/cuDNN major versions match your ONNX Runtime build:
+   - CUDA 11.8 environment -> use ORT GPU build targeting CUDA 11.x and cuDNN 8.x.
+   - CUDA 12.x ORT builds require CUDA 12.x runtime and matching cuDNN major.
+
+Useful reference: [ONNX Runtime CUDA EP requirements](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
+
 ## Notes
 
 - Runtime mặc định dùng `tracker_type: botsort`. `passthrough` chỉ giữ làm fallback debug.
