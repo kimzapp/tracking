@@ -183,11 +183,16 @@ OrtRuntimeSelection ConfigureOrtExecutionProvider(Ort::SessionOptions* options,
       continue;
     }
 
-    if (candidate.try_cuda_specialized_api &&
-        AppendCudaProvider(options, gpu_device_id, &last_error)) {
-      selection.effective_device = "gpu";
-      selection.provider = candidate.provider;
-      return selection;
+    if (candidate.try_cuda_specialized_api) {
+      if (AppendCudaProvider(options, gpu_device_id, &last_error)) {
+        selection.effective_device = "gpu";
+        selection.provider = candidate.provider;
+        return selection;
+      }
+      // Older ORT versions may not support generic EP name-based append for CUDA.
+      // If specialized CUDA append failed, keep that error as-is instead of replacing
+      // it with a misleading "Unknown provider name" generic API error.
+      continue;
     }
 
     for (const std::string& provider_alias : candidate.append_aliases) {
