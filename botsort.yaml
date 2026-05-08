@@ -3,7 +3,7 @@
 # Giảm: bắt được object yếu tốt hơn, nhưng dễ tăng false positive và ID switch.
 track_high_thresh:
   type: uniform
-  default: 0.3
+  default: 0.45
   range: [0.2, 0.7]
 
 # Ngưỡng confidence tối thiểu để giữ detection cho vòng ghép cặp thứ 2.
@@ -11,7 +11,7 @@ track_high_thresh:
 # Giảm: giữ được nhiều detection yếu hơn, nhưng dễ dính nhiễu nhiều.
 track_low_thresh:
   type: uniform
-  default: 0.1
+  default: 0.15
   range: [0.01, 0.3]
 
 # Ngưỡng tạo track mới.
@@ -19,7 +19,7 @@ track_low_thresh:
 # Giảm: dễ tạo ID mới hơn (tốt khi object xuất hiện đột ngột), nhưng dễ trùng lặp ID.
 new_track_thresh:
   type: uniform
-  default: 0.7
+  default: 0.75
   range: [0.2, 0.9]
 
 # Số frame tối đa giữ track ở trạng thái lost trước khi xóa hẳn.
@@ -27,7 +27,7 @@ new_track_thresh:
 # Giảm: xóa track nhanh, dễ mất cơ hội re-assign ID cũ.
 track_buffer:
   type: randint
-  default: 500
+  default: 450
   range: [30, 600]
 
 # Ngưỡng chấp nhận cost sau khi trộn (IoU + embedding) trong Hungarian matching.
@@ -35,7 +35,7 @@ track_buffer:
 # Giảm: match chặt hơn, nhưng dễ tạo ID mới khi object quay lại.
 match_thresh:
   type: uniform
-  default: 0.8
+  default: 0.72
   range: [0.1, 0.9]
 
 # Ngưỡng gần về hình học (IoU-distance gate) dùng trong logic liên quan đến proximity.
@@ -43,7 +43,7 @@ match_thresh:
 # Trong bản đã ưu tiên ReID, tham số này ảnh hưởng nhẹ hơn trước.
 proximity_thresh:
   type: uniform
-  default: 0.7
+  default: 0.55
   range: [0.25, 0.75]
 
 # Ngưỡng embedding distance (cosine distance) để coi là cùng danh tính.
@@ -51,7 +51,7 @@ proximity_thresh:
 # Giảm: chặt hơn, giảm nhầm ID nhưng dễ fail khi object thay đổi pose/ánh sáng.
 appearance_thresh:
   type: uniform
-  default: 0.3
+  default: 0.32
   range: [0.1, 0.8]
 
 
@@ -61,7 +61,7 @@ appearance_thresh:
 # Giảm: ghép chặt hơn, giảm nhầm nhưng dễ bỏ lỡ reconnect.
 second_association_thresh:
   type: uniform
-  default: 0.5
+  default: 0.35
   range: [0.1, 0.95]
 
 # Ngưỡng ghép cặp cho nhóm track unconfirmed.
@@ -90,14 +90,14 @@ reid_recovery_proximity_thresh:
 # Giảm: siết chặt điều kiện ngoại hình trong recovery.
 reid_recovery_appearance_thresh:
   type: uniform
-  default: 0.5
+  default: 0.35
   range: [0.1, 0.8]
 
 # Ngưỡng cost cho bước reid_recovery sau khi lấy trung bình:
 # d = (iou_dist + emb_dist) / 2.
 # Tăng: dễ match hơn; Giảm: match chặt hơn.
-# Recommended range: [0.20, 0.55], default: 0.35
-reid_recovery_thresh: 0.48
+# Recommended range: [0.20, 0.55], default: 0.40
+reid_recovery_thresh: 0.40
 
 # Camera Motion Compensation.
 # ecc: thường ổn định và chính xác hơn trong nhiều bối cảnh.

@@ -214,39 +214,44 @@ std::vector<std::pair<int, int>> BoTSORTTracker::LinearAssignment(
     return {};
   }
 
-  bool transposed = false;
-  std::vector<std::vector<float>> a = cost;
-  int rows = n;
-  int cols = m;
-  if (rows > cols) {
-    transposed = true;
-    std::vector<std::vector<float>> t(static_cast<size_t>(cols),
-                                      std::vector<float>(static_cast<size_t>(rows), 0.0F));
-    for (int i = 0; i < rows; ++i) {
-      for (int j = 0; j < cols; ++j) {
-        t[j][i] = a[i][j];
+  // Emulate lapjv(extend_cost=True, cost_limit=threshold):
+  // add row/col-specific dummy assignments at exactly threshold cost.
+  const int dim = n + m;
+  const float reject_cost = threshold + 1e-3F;
+  std::vector<std::vector<float>> a(static_cast<size_t>(dim),
+                                    std::vector<float>(static_cast<size_t>(dim), reject_cost));
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < m; ++j) {
+      const float c = cost[static_cast<size_t>(i)][static_cast<size_t>(j)];
+      if (std::isfinite(c) && c <= threshold) {
+        a[static_cast<size_t>(i)][static_cast<size_t>(j)] = c;
       }
     }
-    a = std::move(t);
-    std::swap(rows, cols);
+    a[static_cast<size_t>(i)][static_cast<size_t>(m + i)] = threshold;
+  }
+  for (int j = 0; j < m; ++j) {
+    a[static_cast<size_t>(n + j)][static_cast<size_t>(j)] = threshold;
+    for (int i = 0; i < n; ++i) {
+      a[static_cast<size_t>(n + j)][static_cast<size_t>(m + i)] = 0.0F;
+    }
   }
 
-  std::vector<float> u(static_cast<size_t>(rows + 1), 0.0F);
-  std::vector<float> v(static_cast<size_t>(cols + 1), 0.0F);
-  std::vector<int> p(static_cast<size_t>(cols + 1), 0);
-  std::vector<int> way(static_cast<size_t>(cols + 1), 0);
+  std::vector<float> u(static_cast<size_t>(dim + 1), 0.0F);
+  std::vector<float> v(static_cast<size_t>(dim + 1), 0.0F);
+  std::vector<int> p(static_cast<size_t>(dim + 1), 0);
+  std::vector<int> way(static_cast<size_t>(dim + 1), 0);
 
-  for (int i = 1; i <= rows; ++i) {
+  for (int i = 1; i <= dim; ++i) {
     p[0] = i;
     int j0 = 0;
-    std::vector<float> minv(static_cast<size_t>(cols + 1), kHugeCost);
-    std::vector<char> used(static_cast<size_t>(cols + 1), false);
+    std::vector<float> minv(static_cast<size_t>(dim + 1), kHugeCost);
+    std::vector<char> used(static_cast<size_t>(dim + 1), false);
     do {
       used[j0] = true;
       const int i0 = p[j0];
       float delta = kHugeCost;
       int j1 = 0;
-      for (int j = 1; j <= cols; ++j) {
+      for (int j = 1; j <= dim; ++j) {
         if (used[j]) {
           continue;
         }
@@ -262,7 +267,7 @@ std::vector<std::pair<int, int>> BoTSORTTracker::LinearAssignment(
           j1 = j;
         }
       }
-      for (int j = 0; j <= cols; ++j) {
+      for (int j = 0; j <= dim; ++j) {
         if (used[j]) {
           u[p[j]] += delta;
           v[j] -= delta;
@@ -280,8 +285,8 @@ std::vector<std::pair<int, int>> BoTSORTTracker::LinearAssignment(
     } while (j0 != 0);
   }
 
-  std::vector<int> assignment(static_cast<size_t>(rows), -1);
-  for (int j = 1; j <= cols; ++j) {
+  std::vector<int> assignment(static_cast<size_t>(dim), -1);
+  for (int j = 1; j <= dim; ++j) {
     if (p[j] > 0) {
       assignment[static_cast<size_t>(p[j] - 1)] = j - 1;
     }
@@ -291,25 +296,16 @@ std::vector<std::pair<int, int>> BoTSORTTracker::LinearAssignment(
   std::vector<char> row_matched(static_cast<size_t>(n), false);
   std::vector<char> col_matched(static_cast<size_t>(m), false);
 
-  for (int r = 0; r < rows; ++r) {
+  for (int r = 0; r < n; ++r) {
     const int c = assignment[static_cast<size_t>(r)];
-    if (c < 0) {
+    if (c < 0 || c >= m) {
       continue;
     }
-    int row = r;
-    int col = c;
-    if (transposed) {
-      row = c;
-      col = r;
-    }
-    if (row >= n || col >= m) {
-      continue;
-    }
-    const float candidate = cost[static_cast<size_t>(row)][static_cast<size_t>(col)];
+    const float candidate = cost[static_cast<size_t>(r)][static_cast<size_t>(c)];
     if (std::isfinite(candidate) && candidate <= threshold) {
-      matches.emplace_back(row, col);
-      row_matched[static_cast<size_t>(row)] = true;
-      col_matched[static_cast<size_t>(col)] = true;
+      matches.emplace_back(r, c);
+      row_matched[static_cast<size_t>(r)] = true;
+      col_matched[static_cast<size_t>(c)] = true;
     }
   }
 
@@ -605,27 +601,60 @@ void BoTSORTTracker::ApplyWarp(TrackInternal* track, const cv::Mat& warp) const 
   if (!track->has_kf_state || warp.empty() || warp.rows != 2 || warp.cols != 3) {
     return;
   }
-  const float a00 = warp.at<float>(0, 0);
-  const float a01 = warp.at<float>(0, 1);
-  const float a02 = warp.at<float>(0, 2);
-  const float a10 = warp.at<float>(1, 0);
-  const float a11 = warp.at<float>(1, 1);
-  const float a12 = warp.at<float>(1, 2);
-  auto& mean = track->kf_state.mean;
-  const float x = mean[0];
-  const float y = mean[1];
-  mean[0] = a00 * x + a01 * y + a02;
-  mean[1] = a10 * x + a11 * y + a12;
-  const float sx = std::max(1e-3F, std::sqrt(a00 * a00 + a10 * a10));
-  const float sy = std::max(1e-3F, std::sqrt(a01 * a01 + a11 * a11));
-  mean[2] *= sx;
-  mean[3] *= sy;
-  const float vx = mean[4];
-  const float vy = mean[5];
-  mean[4] = a00 * vx + a01 * vy;
-  mean[5] = a10 * vx + a11 * vy;
-  mean[6] *= sx;
-  mean[7] *= sy;
+  const float r00 = warp.at<float>(0, 0);
+  const float r01 = warp.at<float>(0, 1);
+  const float t0 = warp.at<float>(0, 2);
+  const float r10 = warp.at<float>(1, 0);
+  const float r11 = warp.at<float>(1, 1);
+  const float t1 = warp.at<float>(1, 2);
+
+  std::array<float, 64> r8{};
+  for (int block = 0; block < 4; ++block) {
+    const int base = block * 2;
+    r8[static_cast<size_t>(base * 8 + base)] = r00;
+    r8[static_cast<size_t>(base * 8 + (base + 1))] = r01;
+    r8[static_cast<size_t>((base + 1) * 8 + base)] = r10;
+    r8[static_cast<size_t>((base + 1) * 8 + (base + 1))] = r11;
+  }
+
+  std::array<float, 8> transformed_mean{};
+  for (int r = 0; r < 8; ++r) {
+    float sum = 0.0F;
+    for (int c = 0; c < 8; ++c) {
+      sum += r8[static_cast<size_t>(r * 8 + c)] * track->kf_state.mean[static_cast<size_t>(c)];
+    }
+    transformed_mean[static_cast<size_t>(r)] = sum;
+  }
+  transformed_mean[0] += t0;
+  transformed_mean[1] += t1;
+  transformed_mean[2] = std::max(transformed_mean[2], 1e-4F);
+  transformed_mean[3] = std::max(transformed_mean[3], 1e-4F);
+
+  std::array<float, 64> tmp{};
+  for (int r = 0; r < 8; ++r) {
+    for (int c = 0; c < 8; ++c) {
+      float sum = 0.0F;
+      for (int k = 0; k < 8; ++k) {
+        sum += r8[static_cast<size_t>(r * 8 + k)] *
+               track->kf_state.covariance[static_cast<size_t>(k * 8 + c)];
+      }
+      tmp[static_cast<size_t>(r * 8 + c)] = sum;
+    }
+  }
+  std::array<float, 64> transformed_cov{};
+  for (int r = 0; r < 8; ++r) {
+    for (int c = 0; c < 8; ++c) {
+      float sum = 0.0F;
+      for (int k = 0; k < 8; ++k) {
+        sum += tmp[static_cast<size_t>(r * 8 + k)] * r8[static_cast<size_t>(c * 8 + k)];
+      }
+      transformed_cov[static_cast<size_t>(r * 8 + c)] = sum;
+    }
+  }
+
+  track->kf_state.mean = transformed_mean;
+  track->kf_state.covariance = transformed_cov;
+  track->xywh = {transformed_mean[0], transformed_mean[1], transformed_mean[2], transformed_mean[3]};
 }
 
 std::vector<std::vector<float>> BoTSORTTracker::IoUDistance(
@@ -1010,10 +1039,6 @@ Tracks BoTSORTTracker::Update(const Detections& detections, const cv::Mat& frame
             emb = 1.0F;
           }
           const float center = NormCenterDistance(tbox, dbox, diag);
-          if (center > cfg_.reid_recovery_proximity_thresh) {
-            recovery_cost[i][j] = 1.0F;
-            continue;
-          }
           recovery_cost[i][j] = 1.2F * center + 0.2F * emb;
         }
       }
@@ -1107,8 +1132,7 @@ Tracks BoTSORTTracker::Update(const Detections& detections, const cv::Mat& frame
 
   Tracks output;
   for (TrackInternal* t : active_tracks_) {
-    const bool visible_this_frame = t->is_activated || (t->frame_id == frame_count_);
-    if (t->state != TrackState::kTracked || !visible_this_frame) {
+    if (t->state != TrackState::kTracked || !t->is_activated) {
       continue;
     }
     const auto xyxy = CurrentXYXY(*t);
@@ -1261,24 +1285,13 @@ std::vector<std::vector<float>> BoTSORTTracker::ReIdExtractor::Extract(
   if (detections.empty()) {
     return feats;
   }
-  struct Candidate {
-    int index = -1;
-    cv::Mat crop;
-  };
-  std::vector<Candidate> candidates;
-  candidates.reserve(std::min(static_cast<int>(detections.size()), max_detections_));
-
-  std::vector<int> order(detections.size());
-  std::iota(order.begin(), order.end(), 0);
-  std::sort(order.begin(), order.end(), [&](int a, int b) {
-    return detections[static_cast<size_t>(a)].conf > detections[static_cast<size_t>(b)].conf;
-  });
-
-  for (int det_idx : order) {
-    if (static_cast<int>(candidates.size()) >= max_detections_) {
-      break;
-    }
-    const auto& det = detections[static_cast<size_t>(det_idx)];
+  feats.assign(detections.size(), {});
+  std::vector<cv::Mat> crops;
+  std::vector<int> crop_indices;
+  crops.reserve(detections.size());
+  crop_indices.reserve(detections.size());
+  for (size_t det_idx = 0; det_idx < detections.size(); ++det_idx) {
+    const auto& det = detections[det_idx];
     const int x1 = std::max(0, static_cast<int>(std::floor(det.x1)));
     const int y1 = std::max(0, static_cast<int>(std::floor(det.y1)));
     const int x2 = std::min(frame.cols, static_cast<int>(std::ceil(det.x2)));
@@ -1286,18 +1299,16 @@ std::vector<std::vector<float>> BoTSORTTracker::ReIdExtractor::Extract(
     if (x2 <= x1 || y2 <= y1) {
       continue;
     }
-    candidates.push_back({det_idx, frame(cv::Rect(x1, y1, x2 - x1, y2 - y1)).clone()});
+    crops.push_back(frame(cv::Rect(x1, y1, x2 - x1, y2 - y1)).clone());
+    crop_indices.push_back(static_cast<int>(det_idx));
+    if (max_detections_ > 0 && static_cast<int>(crops.size()) >= max_detections_) {
+      break;
+    }
   }
 
-  feats.assign(detections.size(), {});
-  std::vector<cv::Mat> crops;
-  crops.reserve(candidates.size());
-  for (const auto& c : candidates) {
-    crops.push_back(c.crop);
-  }
   const auto batch_feats = RunBatch(crops);
-  for (size_t i = 0; i < candidates.size() && i < batch_feats.size(); ++i) {
-    feats[static_cast<size_t>(candidates[i].index)] = batch_feats[i];
+  for (size_t i = 0; i < crop_indices.size() && i < batch_feats.size(); ++i) {
+    feats[static_cast<size_t>(crop_indices[i])] = batch_feats[i];
   }
   return feats;
 }
@@ -1313,50 +1324,30 @@ BoTSORTTracker::CameraMotionCompensator::CameraMotionCompensator(const TrackerRu
 
 cv::Mat BoTSORTTracker::CameraMotionCompensator::Estimate(
     const cv::Mat& frame, const std::vector<DetectionEx>& detections) {
+  (void)detections;
   if (!enabled_ || frame.empty()) {
     return cv::Mat();
   }
-  frame_counter_ += 1;
   cv::Mat gray;
   cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
   if (prev_gray_.empty()) {
     prev_gray_ = gray;
     return cv::Mat::eye(2, 3, CV_32F);
   }
-  if ((frame_counter_ % interval_) != 0) {
-    prev_gray_ = gray;
-    return last_warp_;
-  }
-
-  const int longest_side = std::max(gray.cols, gray.rows);
-  float scale = 1.0F;
-  if (longest_side > max_side_) {
-    scale = static_cast<float>(max_side_) / static_cast<float>(longest_side);
-  }
+  constexpr float kEccScale = 0.15F;
+  const float scale = kEccScale;
 
   cv::Mat gray_small = gray;
   cv::Mat prev_small = prev_gray_;
-  if (scale < 1.0F) {
+  if (scale > 0.0F && scale < 1.0F) {
     cv::resize(gray, gray_small, cv::Size(), scale, scale, cv::INTER_AREA);
     cv::resize(prev_gray_, prev_small, cv::Size(), scale, scale, cv::INTER_AREA);
   }
 
   cv::Mat warp = cv::Mat::eye(2, 3, CV_32F);
-  cv::Mat mask(gray_small.size(), CV_8UC1, cv::Scalar(255));
-  for (const auto& det : detections) {
-    const int x1 = std::max(0, static_cast<int>(det.x1 * scale));
-    const int y1 = std::max(0, static_cast<int>(det.y1 * scale));
-    const int x2 = std::min(gray_small.cols, static_cast<int>(det.x2 * scale));
-    const int y2 = std::min(gray_small.rows, static_cast<int>(det.y2 * scale));
-    if (x2 > x1 && y2 > y1) {
-      cv::rectangle(mask, cv::Rect(x1, y1, x2 - x1, y2 - y1), cv::Scalar(0), cv::FILLED);
-    }
-  }
-
   try {
-    const auto criteria =
-        cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 20, 1e-3);
-    cv::findTransformECC(prev_small, gray_small, warp, cv::MOTION_AFFINE, criteria, mask);
+    const auto criteria = cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 100, 1e-5);
+    cv::findTransformECC(prev_small, gray_small, warp, cv::MOTION_TRANSLATION, criteria);
     if (scale < 1.0F) {
       warp.at<float>(0, 2) /= scale;
       warp.at<float>(1, 2) /= scale;
